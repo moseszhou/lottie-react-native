@@ -12,9 +12,7 @@ import {
 } from 'react-native';
 import SafeModule from 'react-native-safe-modules';
 
-const getNativeLottieViewForDesktop = () => {
-  return requireNativeComponent('LottieAnimationView');
-};
+const getNativeLottieViewForDesktop = () => requireNativeComponent('LottieAnimationView');
 
 const NativeLottieView =
   Platform.OS === 'macos' || Platform.OS === 'windows'
@@ -74,6 +72,8 @@ class LottieView extends React.PureComponent {
   constructor(props) {
     super(props);
     this.viewConfig = viewConfig;
+    this.refRoot = this.refRoot.bind(this);
+    this.onAnimationFinish = this.onAnimationFinish.bind(this);
   }
 
   componentDidUpdate(prevProps) {
@@ -132,30 +132,42 @@ class LottieView extends React.PureComponent {
     return findNodeHandle(this.root);
   }
 
-  refRoot = (root) => {
+  refRoot(root) {
     this.root = root;
     if (this.props.autoPlay) {
       this.play();
     }
   }
 
-  onAnimationFinish = (evt) => {
+  onAnimationFinish(evt) {
     if (this.props.onAnimationFinish) {
       this.props.onAnimationFinish(evt.nativeEvent.isCancelled);
     }
   }
 
   render() {
-    const { style, source, autoSize, autoPlay, ...rest } = this.props;
+    const { style, source, autoSize, resizeMode, ...rest } = this.props;
 
     const sourceName = typeof source === 'string' ? source : undefined;
     const sourceJson =
       typeof source === 'object' && !source.uri ? JSON.stringify(source) : undefined;
     const sourceURL = typeof source === 'object' && source.uri ? source.uri : undefined;
 
-    const aspectRatioStyle = sourceJson ? { aspectRatio: source.w / source.h } : undefined;
+    const aspectRatio = sourceJson ? source.w / source.h : 1;
+
+    const aspectRatioStyle = sourceJson ? { aspectRatio } : undefined;
 
     const styleObject = StyleSheet.flatten(style);
+
+    if (resizeMode === 'stretch' && (!styleObject.height || !styleObject.width)) {
+      console.error('resizeMode stretch is not supported when height or width is not set');
+    }
+
+    const scaleW =
+      sourceJson && resizeMode === 'stretch'
+        ? styleObject.width / styleObject.height / aspectRatio
+        : 1;
+
     let sizeStyle;
     if (!styleObject || (styleObject.width === undefined && styleObject.height === undefined)) {
       sizeStyle = autoSize && sourceJson ? { width: source.w } : StyleSheet.absoluteFill;
@@ -173,6 +185,7 @@ class LottieView extends React.PureComponent {
         }))
       : undefined;
 
+    // aspectRatioStyle 一定要设置，否则居中会出现问题。
     return (
       <View style={[aspectRatioStyle, sizeStyle, style]}>
         <AnimatedNativeLottieView
@@ -180,7 +193,12 @@ class LottieView extends React.PureComponent {
           {...rest}
           colorFilters={colorFilters}
           speed={speed}
-          style={[aspectRatioStyle, sizeStyle || { width: '100%', height: '100%' }, style]}
+          style={[
+            aspectRatioStyle,
+            sizeStyle || { width: '100%', height: '100%' },
+            style,
+            { transform: [{ scaleX: scaleW }] },
+          ]}
           sourceName={sourceName}
           sourceJson={sourceJson}
           sourceURL={sourceURL}
