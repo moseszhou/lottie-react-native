@@ -1,5 +1,5 @@
 {
-  "name": "@yumc/lottie-react-native",
+  "name": "yumc-lottie-react-native",
   "version": "5.1.5",
   "description": "React Native bindings for Lottie",
   "main": "lib/index.js",
